@@ -1,0 +1,143 @@
+diff --git a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/laterals.f90 b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/laterals.f90
+index 594556c..2ef0e02 100644
+--- a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/laterals.f90
++++ b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/laterals.f90
+@@ -88,6 +88,18 @@ module m_laterals
+    real(kind=dp), allocatable, target, dimension(:, :, :), public :: incoming_lat_concentration !< Concentration of the inflowing water at the lateral discharge location.
+    real(kind=dp), allocatable, target, dimension(:, :), public :: lateral_volume_per_layer !< Total water volume per layer, for each lateral (kmx,numlatsg).
+ 
++   type t_flow_parameter !< General class for Flow parameters that require averaging.
++      real(kind=dp), dimension(:), allocatable :: values !< Averaged values of the flow parameter.
++      logical :: is_used = .false. !< Indicates whether this flow parameter is used.
++      real(kind=dp), dimension(:), pointer :: input_variable !< Input variable to be averaged.
++      real(kind=dp), dimension(:), pointer :: weighing_variable !< Weighing variable for averaging (e.g. cell volume, cell area).
++      integer :: num_elements
++      integer, dimension(:), pointer :: index_start, index_end, index_to_node !< Indexing parameters for mapping input variable to flow parameter locations.
++   contains
++      procedure :: initialize => initialize_flow_parameter !< Initialize flow_parameter, allocate arrays and set pointers
++      procedure :: update => update_flow_parameter !< Update flow_parameter, perform averaging
++   end type t_flow_parameter
++
+    integer, allocatable, target, dimension(:), public :: apply_transport !< Flag to apply transport for laterals (0 means only water and no substances are transported).
+    logical, public :: apply_transport_is_used
+ 
+diff --git a/src/utils_gpl/flow1d_implicit/flow1d_implicit/src/SOFLOW_wrap.f90 b/src/utils_gpl/flow1d_implicit/flow1d_implicit/src/SOFLOW_wrap.f90
+index 8c1f24c..65e69dd 100644
+--- a/src/utils_gpl/flow1d_implicit/flow1d_implicit/src/SOFLOW_wrap.f90
++++ b/src/utils_gpl/flow1d_implicit/flow1d_implicit/src/SOFLOW_wrap.f90
+@@ -294,7 +294,7 @@ call SOFLOW( &
+ !debug 
+         &   debug_wr                                   , &
+ !units  
+-        &   juer                                       , &
++        &   juer                                       &
+ !close
+         &)
+     
+@@ -316,4 +316,4 @@ write(42,*) 'waoft3'
+ write(42,*) waoft(:,3)
+ endif
+ 
+-end subroutine SOFLOW_wrap
+\ No newline at end of file
++end subroutine SOFLOW_wrap
+diff --git a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/structure_parameters.f90 b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/structure_parameters.f90
+index 005d3ad8..eb33a26d 100644
+--- a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/structure_parameters.f90
++++ b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute/structure_parameters.f90
+@@ -37,12 +37,37 @@ contains
+ 
+    subroutine structure_parameters
+       use m_flowgeom, only: ln, wu
+-      use m_flow, only: dp, npumpsg, ngatesg, ncdamsg, ncgensg, ngategen, nweirgen, ngenstru, aerr, dmiss, pumpswithlevels, l1pumpsg, l2pumpsg, kpump, l1gatesg, l2gatesg, kgate, q1, s1, l1cdamsg, l2cdamsg, kcdam, l1cgensg, l2cgensg, kcgen, hu, epshu, hs, epshs, gate2cgen, zcgen, weir2cgen, genstru2cgen
+-      use m_structures, only: numvals_pump, numvals_gate, numvals_cdam, numvals_cgen, numvals_gategen, numvals_weirgen, numvals_genstru, numvals_dambreak, network, numvals_uniweir, numvals_orifgen, numvals_culvert, numvals_bridge, numvals_cmpstru, numvals_longculvert, valpump, numvals_common_pump, fill_valstruct_perlink, valgate, valcdam, valcgen, valgategen, ival_width, ival_widthwet, ival_dis, ival_widthup, ival_s1up, ival_widthdn, ival_s1dn, ival_widthupdn, ival_head, ival_gate_widthwet, ival_gate_flowh, ival_gate_count, ival_gate_openw, ival_gate_edgel, ival_gate_sillh, valweirgen, fill_valstruct_per_structure, valorifgen, valbridge, valculvert, ival_cl_crestl, ival_cl_state, ival_cl_edgel, ival_cl_openh, valuniweir, ival_uw_crestl, valdambreak, valgenstru, ival_openw, ival_edgel, ival_crestl, valcmpstru, vallongculvert, average_valstruct, ival_crestw, ival_pp_cap, ival_pp_disdir, ival_pp_stag, ival_pp_s1suc, ival_pp_s1del, ival_pp_head, ival_pp_red
++      use m_flow, only: dp, npumpsg, ngatesg, ncdamsg, ncgensg, ngategen, &
++	nweirgen, ngenstru, aerr, dmiss, pumpswithlevels, l1pumpsg, &
++	l2pumpsg, kpump, l1gatesg, l2gatesg, kgate, q1, s1, l1cdamsg, &
++	l2cdamsg, kcdam, l1cgensg, l2cgensg, kcgen, hu, epshu, hs, epshs, &
++	gate2cgen, zcgen, weir2cgen, genstru2cgen
++      use m_structures, only: numvals_pump, numvals_gate, numvals_cdam, &
++	numvals_cgen, numvals_gategen, numvals_weirgen, numvals_genstru, &
++	numvals_dambreak, network, numvals_uniweir, numvals_orifgen, &
++	numvals_culvert, numvals_bridge, numvals_cmpstru, numvals_longculvert, &
++	valpump, numvals_common_pump, fill_valstruct_perlink, valgate, &
++	valcdam, valcgen, valgategen, ival_width, ival_widthwet, &
++	ival_dis, ival_widthup, ival_s1up, ival_widthdn, ival_s1dn, &
++	ival_widthupdn, ival_head, ival_gate_widthwet, ival_gate_flowh, &
++	ival_gate_count, ival_gate_openw, ival_gate_edgel, ival_gate_sillh, &
++	valweirgen, fill_valstruct_per_structure, valorifgen, valbridge, &
++	valculvert, ival_cl_crestl, ival_cl_state, ival_cl_edgel, &
++	ival_cl_openh, valuniweir, ival_uw_crestl, valdambreak, &
++	valgenstru, ival_openw, ival_edgel, ival_crestl, valcmpstru, &
++	vallongculvert, average_valstruct, ival_crestw, ival_pp_cap, &
++	ival_pp_disdir, ival_pp_stag, ival_pp_s1suc, ival_pp_s1del, &
++	ival_pp_head, ival_pp_red
+       use m_flowtimes, only: ti_his, time1
+-      use m_1d_structures, only: get_crest_level, get_culvert_state, get_gle, get_opening_height, getpumpcapacity, getpumpstage, getpumpreductionfactor
+-      use m_GlobalParameters, only: st_pump, st_weir, st_unset, st_orifice, st_bridge, st_culvert, st_uni_weir, st_general_st, st_compound, st_longculvert
+-      use m_partitioninfo, only: jampi, reducebuf, nreducebuf, my_rank, idomain, reduce_crs
++
++      use m_1d_structures, only: get_crest_level, get_culvert_state, &
++	get_gle, get_opening_height, getpumpcapacity, getpumpstage, &
++	getpumpreductionfactor
++      use m_GlobalParameters, only: st_pump, st_weir, st_unset, &
++	st_orifice, st_bridge, st_culvert, st_uni_weir, st_general_st, &
++	st_compound, st_longculvert
++      use m_partitioninfo, only: jampi, reducebuf, nreducebuf, my_rank, &
++	idomain, reduce_crs
+       use m_longculverts, only: nlongculverts, longculverts, newculverts
+       use m_dambreak_breach, only: fill_dambreak_values, n_db_signals
+       use m_link_ghostdata, only: link_ghostdata
+diff --git a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute_sediment/inipointers_erosed.f90 b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute_sediment/inipointers_erosed.f90
+index 93f72d1a..20545bdb 100644
+--- a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute_sediment/inipointers_erosed.f90
++++ b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/compute_sediment/inipointers_erosed.f90
+@@ -44,7 +44,34 @@ contains
+    ! ========================================================================================
+    !
+    subroutine inipointers_erosed()
+-      use m_fm_erosed, only : stm_included, dzbdt, mtd, seddif, blchg, sed, ws, uau, lsed, stmpar, lsedtot, nmudfrac, max_mud_sedtyp, cmpupdfrac, rhosol, cdryb, logseddia, logsedsig, sedd10, sedd50, sedd90, sedd50fld, dstar, taucr, tetacr, mudcnt, pmcrit, nseddia, sedtyp, tratyp, anymud, sedtrcfac, bsskin, thcmud, tpsnumber, dss, min_dxx_sedtyp, flocmod, nflocpop, nflocsizes, floclist, tbreakup, tfloc, thresh, sus, suscorfac, bed, susw, sedthr, bedw, i10, i15, i50, i90, nxx, xx, multi, eqmbcsand, eqmbcmud, factcr, factsd, ihidexp, asklhe, mwwjhe, ffthresh, morfac, varyingmorfac, morft, hydrt, espir, epspar, camax, aksfac, rdc, iopkcw, oldmudfrac, sinkf, sourf, iflufflyr, depfac, mfluff, alfabs, alfabn, wetslope, avaltime, duneavalan, dryslope, hswitch, dzmaxdune, ashld, bshld, cshld, dshld, alfpa, thcrpa, islope, ti_sedtrans, tmor, tcmp, itmor, bedupd, neglectentrainment, dzmax, hmaxth, thetsd, eulerisoglm, l_suscor, bermslopetransport, bermslopebed, bermslopesus, bermslope, bermslopefac, bermslopegamma, bermslopedepth, iform, par, npar, max_integers, max_reals, max_strings, dll_function, dll_handle, dll_integers, dll_reals, dll_strings, dll_usrfil, aks, sedtra, bc_mor_array, dbodsd, dcwwlc, dm, dg, dgsd, dxx, e_dzdn, e_dzdt, epsclc, epswlc, fixfac, frac, kfsed, kmxsed, mudfrac, sandfrac, hidexp, rsdqlc, rsedeq, sbcx, sbcy, e_sbcn, e_sbct, e_sbn, e_sbt, e_ssn, e_sst, e_sbnc, e_sbtc, e_ssnc, e_scrn, e_scrt, sbwx, sbwy, sscx, sscy, e_sbwn, e_sbwt, sddflc, sswx, sswy, e_sswn, e_sswt, sxtot, sytot, sbxcum, sbycum, ssxcum, ssycum, sinkse, sourse, sour_im, srcmax, taub, taurat, ust2, umod, uuu, vvv, wslc, zumod, rca, statqnt
++
++      use m_fm_erosed, only : stm_included, dzbdt, mtd, seddif, & 
++      blchg, ws, uau, lsed, stmpar, lsedtot, nmudfrac, max_mud_sedtyp, &
++      cmpupdfrac, rhosol, cdryb, logseddia, logsedsig, sedd10, sedd50, & 
++      sedd90, sedd50fld, dstar, taucr, tetacr, mudcnt, pmcrit, nseddia, &
++      sedtyp, tratyp, anymud, sedtrcfac, bsskin, thcmud, tpsnumber, &
++      dss, min_dxx_sedtyp, flocmod, nflocpop, nflocsizes, floclist, &
++      tbreakup, tfloc, thresh, sus, suscorfac, bed, susw, sedthr, &
++      bedw, i10, i15, i50, i90, nxx, xx, multi, eqmbcsand, eqmbcmud, &
++      factcr, factsd, ihidexp, asklhe, mwwjhe, ffthresh, morfac, &
++      varyingmorfac, morft, hydrt, espir, epspar, camax, aksfac, &
++      rdc, iopkcw, oldmudfrac, sinkf, sourf, iflufflyr, depfac, &
++      mfluff, alfabs, alfabn, wetslope, avaltime, duneavalan, &
++      dryslope, hswitch, dzmaxdune, ashld, bshld, cshld, dshld, &
++      alfpa, thcrpa, islope, ti_sedtrans, tmor, tcmp, itmor, &
++      bedupd, neglectentrainment, dzmax, hmaxth, thetsd, eulerisoglm, &
++      l_suscor, bermslopetransport, bermslopebed, bermslopesus, bermslope, &
++      bermslopefac, bermslopegamma, bermslopedepth, iform, par, npar, &
++      max_integers, max_reals, max_strings, dll_function, dll_handle, &
++      dll_integers, dll_reals, dll_strings, dll_usrfil, aks, sedtra, &
++      bc_mor_array, dbodsd, dcwwlc, dm, dg, dgsd, dxx, e_dzdn, e_dzdt, &
++      epsclc, epswlc, fixfac, frac, kfsed, kmxsed, mudfrac, sandfrac, &
++      hidexp, rsdqlc, rsedeq, sbcx, sbcy, e_sbcn, e_sbct, e_sbn, e_sbt, &
++      e_ssn, e_sst, e_sbnc, e_sbtc, e_ssnc, e_scrn, e_scrt, sbwx, &
++      sbwy, sscx, sscy, e_sbwn, e_sbwt, sddflc, sswx, sswy, e_sswn, &
++      e_sswt, sxtot, sytot, sbxcum, sbycum, ssxcum, ssycum, sinkse, &
++      sourse, sour_im, srcmax, taub, taurat, ust2, umod, uuu, vvv, &
++      wslc, zumod, rca, statqnt, sed
+ 
+       if (.not. stm_included) return
+ 
+diff --git a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/timespace/fm_external_forcings_update.f90 b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/timespace/fm_external_forcings_update.f90
+index 2d73a48f..1828557f 100644
+--- a/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/timespace/fm_external_forcings_update.f90
++++ b/src/engines_gpl/dflowfm/packages/dflowfm_kernel/src/dflowfm_kernel/timespace/fm_external_forcings_update.f90
+@@ -48,7 +48,7 @@ submodule(fm_external_forcings) fm_external_forcings_update
+    use dfm_error, only: dfm_noerr, dfm_extforcerror
+    use m_calibration, only: calibration_backup_frcu
+    use unstruc_channel_flow, only: network
+-   use time_class, only: c_time, ecgetvalues
++   use time_class, only: c_time
+    use m_longculverts, only: nlongculverts
+    use m_nearfield, only: nearfield_mode, NEARFIELD_UPDATED, addNearfieldData
+    use m_airdensity, only: get_airdensity
