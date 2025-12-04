@@ -108,8 +108,8 @@ WORKDIR $HOME/Delft3D
 WORKDIR $HOME
 COPY *.patch .
 WORKDIR $HOME/Delft3D
-RUN patch -p1 -f -i ../arm64_base.patch || true
-RUN patch -p1 -f -i ../arm64_${DIMR_VERSION}.patch || true
+RUN patch -p1 -f -i ../arm64-base.patch || true
+RUN patch -p1 -f -i ../arm64-${DIMR_VERSION}.patch || true
 RUN git init
 RUN git add .
 RUN git config --global user.email "you@example.com"

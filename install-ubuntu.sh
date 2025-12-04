@@ -78,8 +78,8 @@ cd $HOME/Delft3D
 # Install patches to enable Arm64 compilation
 
 cd Delft3D
-patch -p1 -f -i ../arm64_base.patch
-patch -p1 -f -i ../arm64_${DIMR_VERSION}.patch
+patch -p1 -f -i ../arm64-base.patch
+patch -p1 -f -i ../arm64-${DIMR_VERSION}.patch
 git init
 git add .
 git commit -m "Initial commit"
