@@ -14,7 +14,8 @@ mkdir -p $HOME
 export PATH=$(echo $PATH | sed 's#\(:/opt/homebrew[^:]*\)*##g')
 export PATH="/opt/local/bin:/opt/local/sbin:/usr/bin:/bin:$PATH"
 
-# Install gcc15 including gfortran
+
+# Install gcc15 and other non-DIMR-specific tools including gfortran
 
 sudo port install gcc15 cmake wget nano git patchelf subversion ninja pkgconfig openssl
 sudo port select --set gcc mp-gcc15
