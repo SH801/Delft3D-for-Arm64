@@ -38,10 +38,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt install -y software-properties-common dirmngr build-essential
 RUN add-apt-repository ppa:ubuntu-toolchain-r/test
 RUN apt update
-RUN apt install -y gcc-13 g++-13 gfortran-13
-RUN update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-13 130
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 130
-RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 130
 RUN apt-get update && apt-get install -y 	ninja-build petsc-dev patchelf wget nano git subversion \
 											hdf5-tools hdf5-helpers libhdf5-dev libhdf5-doc libhdf5-serial-dev \
 											netcdf-bin metis libgdal-dev uuid-dev sqlite3 \
@@ -115,4 +111,4 @@ RUN git add .
 RUN git config --global user.email "you@example.com"
 RUN git config --global user.name "Your Name"
 RUN git commit -m "Initial commit"
-#RUN ./build.sh all
+RUN ./build.sh all

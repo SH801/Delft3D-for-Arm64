@@ -10,6 +10,9 @@ src/**
 .idea/*
 .vs/**
 
+# macos
+.DS_Store
+
 # python virtual environment and caches
 .venv
 __pycache__
