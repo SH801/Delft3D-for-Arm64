@@ -4,6 +4,7 @@ build*/**
 install_*/**
 install/**
 src/**
+delft_src/**
 
 # editor files
 .vscode

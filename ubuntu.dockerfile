@@ -13,7 +13,7 @@ ENV HOME=/root
 
 # Set versions of software at start to allow incremental build
 
-ENV CMAKE_VERSION="4.2.0"
+ENV CMAKE_VERSION="3.31.10"
 ENV NETCDF_FORTRAN_VERSION="4.6.2"
 ENV ESMF_VERSION="8.9.0"
 ENV DIMR_VERSION="2026.01"
@@ -104,8 +104,7 @@ WORKDIR $HOME/Delft3D
 WORKDIR $HOME
 COPY *.patch .
 WORKDIR $HOME/Delft3D
-RUN patch -p1 -f -i ../arm64-base.patch || true
-RUN patch -p1 -f -i ../arm64-${DIMR_VERSION}.patch || true
+RUN patch -p1 -f -i ../001-${DIMR_VERSION}.patch || true
 RUN git init
 RUN git add .
 RUN git config --global user.email "you@example.com"
