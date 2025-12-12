@@ -7,7 +7,7 @@ Intel Fortran compiler does not run natively on arm64 platforms so this project 
 - **GNU Toolchain**: Desirable to have Delft3DFM working with widely used and supported GNU toolchain. 
 - **Streamlined build**: Streamline Delft3DFM build process by specifying reliable library versions in single install script.
 - **Arm64**: Cloud providers are embracing arm64 CPUs as low-cost way to deliver high computing power.
-- **Mac Silicon platforms**: Latest Macs use Arm64 chipsets. 
+- **Mac Silicon platforms**: Latest Silicon Macs use arm64 chipsets. 
 ## Limitations
 
 As of 12/12/2025:
