@@ -6,6 +6,9 @@ install/**
 src/**
 delft_src/**
 
+# don't ignore build_config
+!build_config/**
+
 # editor files
 .vscode
 .idea/*
