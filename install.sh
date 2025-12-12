@@ -1,12 +1,14 @@
 #!/bin/bash
 
-# ---------------------------------------------
-# Helper script for building Delft3DFM on Mac Arm64
-# 07/12/2025: Still incomplete due to platform-specific code
-# ---------------------------------------------
+# ------------------------------------------------------------------
+# Install script for building Delft3DFM on Arm64 Mac or Ubuntu 24.04
+# ------------------------------------------------------------------
 
 
 # General setup
+
+set -e
+read -s -p "Enter password for sudo: " sudoPW
 
 OS_NAME=$(uname -s)
 MEM_REQUIRED_KB=1048576
@@ -56,6 +58,13 @@ else
 fi
 
 export DIMR_INSTALL_HOME=$(pwd)/delft_src
+
+# Clean up previously installed src folder
+
+if [ -d "${DIMR_INSTALL_HOME}" ]; then
+    echo $sudoPW | sudo -S rm -r ${DIMR_INSTALL_HOME}
+fi
+
 mkdir -p $DIMR_INSTALL_HOME
 
 
@@ -69,8 +78,8 @@ if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
     export PATH="/opt/local/bin:/opt/local/sbin:/usr/bin:/bin:$PATH"
     # NOTE: gsed provides gnu-compliant versions of sed and tr as
     # built-in Mac versions of sed/tr don't function same as gnu sed/tr
-    sudo port -N install gcc15 cmake wget nano git patchelf subversion ninja pkgconfig openssl gmake gsed xercesc3 +all
-    sudo port select --set gcc mp-gcc15
+    echo $sudoPW | sudo -S port -N install gcc15 cmake wget nano git patchelf subversion ninja pkgconfig openssl gmake gsed xercesc3 +all
+    echo $sudoPW | sudo -S port select --set gcc mp-gcc15
     export DIMR_PLATFORM_PREFIX=/opt/local
     export CFLAGS="-O2 -arch arm64"
     export CXXFLAGS="-O2 -arch arm64"
@@ -84,8 +93,9 @@ if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
     export ESMF_PLATFORM_FOLDER="Darwin.gfortranclang.64.mpiuni.default"
 elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
     export DEBIAN_FRONTEND=noninteractive
-    sudo apt-get update && sudo apt-get install -y  gcc g++ gfortran wget nano git cmake gmake build-essential \
-                                                    patchelf subversion ninja-build pkg-config libssl-dev libexpat1-dev
+    echo $sudoPW | sudo -S apt-get update
+    echo $sudoPW | sudo -S apt-get install -y   gcc g++ gfortran wget nano git cmake gmake build-essential \
+                                                patchelf subversion ninja-build pkg-config libssl-dev libexpat1-dev
     export DIMR_PLATFORM_PREFIX=/usr
     export LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib/gcc"
     export LIBS="-lstdc++ -lgfortran"
@@ -101,58 +111,57 @@ export FC=${DIMR_PLATFORM_PREFIX}/bin/gfortran
 export ESMF_PARENT_FOLDER="${DIMR_PLATFORM_PREFIX}"
 
 
-# # Install version of cmake that works with petsc
+# Install version of cmake that works with petsc and Deltares
 
-# cd $DIMR_INSTALL_HOME
-# export CMAKE_VERSION="3.31.10"
-# wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz
-# tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-# rm cmake-${CMAKE_VERSION}.tar.gz
-# cd cmake-${CMAKE_VERSION}
-# if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
-#     export CMAKE_PREFIX_PATH="/opt/local"
-#     ./bootstrap --prefix=${DIMR_PLATFORM_PREFIX} \
-#                 CC=/usr/bin/clang \
-#                 CXX=/usr/bin/clang++ \
-#                 CFLAGS="-arch arm64" \
-#                 CXXFLAGS="-arch arm64" \
-#                 LDFLAGS="-arch arm64" 
-#     unset CMAKE_PREFIX_PATH
-# elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
-#     ./bootstrap --prefix=${DIMR_PLATFORM_PREFIX}
-# fi
-# make -j$MAX_JOBS
-# sudo make install
+cd $DIMR_INSTALL_HOME
+export CMAKE_VERSION="3.31.10"
+wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz
+tar -xzf cmake-${CMAKE_VERSION}.tar.gz
+rm cmake-${CMAKE_VERSION}.tar.gz
+cd cmake-${CMAKE_VERSION}
+if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
+    export CMAKE_PREFIX_PATH="/opt/local"
+    ./bootstrap --prefix=${DIMR_PLATFORM_PREFIX} \
+                CC=/usr/bin/clang \
+                CXX=/usr/bin/clang++ \
+                CFLAGS="-arch arm64" \
+                CXXFLAGS="-arch arm64" \
+                LDFLAGS="-arch arm64" 
+    unset CMAKE_PREFIX_PATH
+elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
+    ./bootstrap --prefix=${DIMR_PLATFORM_PREFIX}
+fi
+make -j$MAX_JOBS
+echo $sudoPW | sudo -S make install
 
 
-# # Install mpich
+# Install mpich
 
-# cd $DIMR_INSTALL_HOME
-# export MPICH_VERSION="4.3.2"
-# wget https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPICH_VERSION}.tar.gz
-# tar -xvf mpich-${MPICH_VERSION}.tar.gz
-# rm mpich-${MPICH_VERSION}.tar.gz
-# cd mpich-${MPICH_VERSION}
-# if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
-#     ./configure --prefix=${DIMR_PLATFORM_PREFIX} \
-#                 CC=${CC} \
-#                 CXX=${CXX} \
-#                 FC=${FC} \
-#                 --enable-fortran=all \
-#                 --enable-cxx \
-#                 --enable-shared \
-#                 CFLAGS="-O2 -arch arm64" \
-#                 LDFLAGS=${LDFLAGS} \
-#                 LIBS="-lstdc++ -lgfortran"
-# elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
-#     ./configure --prefix=${DIMR_PLATFORM_PREFIX} \
-#                 --enable-fortran=all \
-#                 --enable-cxx \
-#                 --enable-shared 
-# fi
-
-# make -j$MAX_JOBS
-# sudo make install
+cd $DIMR_INSTALL_HOME
+export MPICH_VERSION="4.3.2"
+wget https://www.mpich.org/static/downloads/${MPICH_VERSION}/mpich-${MPICH_VERSION}.tar.gz
+tar -xvf mpich-${MPICH_VERSION}.tar.gz
+rm mpich-${MPICH_VERSION}.tar.gz
+cd mpich-${MPICH_VERSION}
+if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
+    ./configure --prefix=${DIMR_PLATFORM_PREFIX} \
+                CC=${CC} \
+                CXX=${CXX} \
+                FC=${FC} \
+                --enable-fortran=all \
+                --enable-cxx \
+                --enable-shared \
+                CFLAGS="-O2 -arch arm64" \
+                LDFLAGS=${LDFLAGS} \
+                LIBS="-lstdc++ -lgfortran"
+elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
+    ./configure --prefix=${DIMR_PLATFORM_PREFIX} \
+                --enable-fortran=all \
+                --enable-cxx \
+                --enable-shared 
+fi
+make -j$MAX_JOBS
+echo $sudoPW | sudo -S make install
 
 
 # With mpi installed, set up environment variables
@@ -171,185 +180,194 @@ fi
 
 cd $DIMR_INSTALL_HOME
 export PETSC_VERSION="3.21.3"
-# wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz
-# tar -xzf petsc-${PETSC_VERSION}.tar.gz
-# rm petsc-${PETSC_VERSION}.tar.gz
-# cd petsc-${PETSC_VERSION}
-# sudo mkdir ${DIMR_PLATFORM_PREFIX}/petsc
-# sudo chown $USER ${DIMR_PLATFORM_PREFIX}/petsc
-export PETSC_DIR=`pwd` 
-# ./configure \
-#     --prefix=${DIMR_PLATFORM_PREFIX}/petsc \
-#     --with-debugging=0 \
-#     --with-fortran-bindings \
-#     --with-pic \
-#     --with-shared-libraries \
-#     --with-scalar-type=real \
-#     --with-c-compiler=${CC} \
-#     --with-cxx-compiler=${CXX} \
-#     --with-fortran-compiler=${FC} \
-#     ${PETSC_MAKE_LOCATION} \
-#     --download-fblaslapack \
-#     --download-metis \
-#     --download-parmetis \
-#     --with-cmake-arguments="-DCMAKE_POLICY_VERSION_MINIMUM=3.5" \
-#     LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib/gcc15" \
-#     COPTFLAGS='-O3 -march=native' \
-#     CXXOPTFLAGS='-O3 -march=native' \
-#     FOPTFLAGS='-O3 -march=native'
-# make PETSC_DIR=`pwd` PETSC_ARCH=${PETSC_ARCH} all
-# make PETSC_DIR=`pwd` PETSC_ARCH=${PETSC_ARCH} install
+wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz
+tar -xzf petsc-${PETSC_VERSION}.tar.gz
+rm petsc-${PETSC_VERSION}.tar.gz
+cd petsc-${PETSC_VERSION}
+export PETSC_DIR=`pwd`
+if [ -d "${DIMR_PLATFORM_PREFIX}/petsc" ]; then
+    echo "Found previous petsc folder, deleting..."
+    echo $sudoPW | sudo -S rm -r ${DIMR_PLATFORM_PREFIX}/petsc
+fi
+echo $sudoPW | sudo -S mkdir ${DIMR_PLATFORM_PREFIX}/petsc
+echo $sudoPW | sudo -S chown $USER ${DIMR_PLATFORM_PREFIX}/petsc
+./configure \
+    --prefix=${DIMR_PLATFORM_PREFIX}/petsc \
+    --with-debugging=0 \
+    --with-fortran-bindings \
+    --with-pic \
+    --with-shared-libraries \
+    --with-scalar-type=real \
+    --with-c-compiler=${CC} \
+    --with-cxx-compiler=${CXX} \
+    --with-fortran-compiler=${FC} \
+    ${PETSC_MAKE_LOCATION} \
+    --download-fblaslapack \
+    --download-metis \
+    --download-parmetis \
+    --with-cmake-arguments="-DCMAKE_POLICY_VERSION_MINIMUM=3.5" \
+    LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib/gcc15" \
+    COPTFLAGS='-O3 -march=native' \
+    CXXOPTFLAGS='-O3 -march=native' \
+    FOPTFLAGS='-O3 -march=native'
+make PETSC_DIR=`pwd` PETSC_ARCH=${PETSC_ARCH} all
+make PETSC_DIR=`pwd` PETSC_ARCH=${PETSC_ARCH} install
 export PKG_CONFIG_PATH="${DIMR_PLATFORM_PREFIX}/petsc/lib/pkgconfig:${PKG_CONFIG_PATH}"
 
 
-# # Install gtest 1.14.0 (not latest) for compliance with old Deltares
+# Install gtest 1.14.0 (not latest) for compliance with old Deltares
 
-# cd $DIMR_INSTALL_HOME
-# export GTEST_VERSION="1.14.0"
-# wget https://github.com/google/googletest/archive/refs/tags/v${GTEST_VERSION}.tar.gz -O gtest-${GTEST_VERSION}.tar.gz
-# tar -xzf gtest-${GTEST_VERSION}.tar.gz
-# rm gtest-${GTEST_VERSION}.tar.gz
-# cd googletest-${GTEST_VERSION}
-# mkdir build
-# cd build
-# cmake .. -DBUILD_GMOCK=OFF -DCMAKE_INSTALL_PREFIX=${DIMR_PLATFORM_PREFIX}
-# make -j$MAX_JOBS
-# sudo make install
-
-
-# # Install rest of software
-
-# if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
-#     sudo port -N install szip zlib metis expat proj6 json-c gdal ossp-uuid tiff +all
-
-#     # Install specific boost on Mac that is required for Delft3DFM
-#     # NOTE: Issue with github releases so use boost.io
-#     cd $DIMR_INSTALL_HOME
-#     export BOOST_VERSION="1.85.0"
-#     export BOOST_VERSION_UNDERSCORED=${BOOST_VERSION//\./_}
-#     wget https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${BOOST_VERSION_UNDERSCORED}.tar.bz2
-#     tar -xf boost_${BOOST_VERSION_UNDERSCORED}.tar.bz2
-#     rm boost_${BOOST_VERSION_UNDERSCORED}.tar.bz2
-#     mv boost_${BOOST_VERSION_UNDERSCORED} boost-${BOOST_VERSION}
-#     cd boost-${BOOST_VERSION}
-#     ./bootstrap.sh --prefix=${DIMR_PLATFORM_PREFIX} --with-toolset=gcc
-#     sudo ./b2 install architecture=arm \
-#                     address-model=64 \
-#                     link=shared \
-#                     runtime-link=shared \
-#                     boost.stacktrace.from_exception=off \
-#                     -j$MAX_JOBS
-
-#     export PROJ6_PKG_FOLDER=/opt/local/lib/proj6/lib/pkgconfig
-#     export PKG_CONFIG_PATH="${PROJ6_PKG_FOLDER}:/opt/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
-# elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
-#     sudo apt-get update && sudo apt-get install -y metis libgdal-dev libboost-all-dev uuid-dev sqlite3 libtiff-dev 
-# fi
+cd $DIMR_INSTALL_HOME
+export GTEST_VERSION="1.14.0"
+wget https://github.com/google/googletest/archive/refs/tags/v${GTEST_VERSION}.tar.gz -O gtest-${GTEST_VERSION}.tar.gz
+tar -xzf gtest-${GTEST_VERSION}.tar.gz
+rm gtest-${GTEST_VERSION}.tar.gz
+cd googletest-${GTEST_VERSION}
+mkdir build
+cd build
+cmake .. -DBUILD_GMOCK=OFF -DCMAKE_INSTALL_PREFIX=${DIMR_PLATFORM_PREFIX}
+make -j$MAX_JOBS
+echo $sudoPW | sudo -S make install
 
 
-# # Install hdf5 using mpi
+# Install rest of software
 
-# cd $DIMR_INSTALL_HOME
-# export HDF5_VERSION="1.14.6"
-# wget https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-${HDF5_VERSION}.tar.gz
-# tar -zxvf hdf5-${HDF5_VERSION}.tar.gz
-# rm hdf5-${HDF5_VERSION}.tar.gz
-# mv hdf5-hdf5-${HDF5_VERSION} hdf5-${HDF5_VERSION}
-# cd hdf5-${HDF5_VERSION}
-# mkdir build
-# cd build
-# export CMAKE_PREFIX_PATH="/opt/local"
-# export CMAKE_IGNORE_PATH="/opt/homebrew;/usr/local"
-# export CMAKE_LIBRARY_PATH="/opt/local/lib:/opt/local/lib/libaec/lib"
-# ${DIMR_PLATFORM_PREFIX}/bin/cmake \
-#     -DCMAKE_INSTALL_PREFIX="${DIMR_PLATFORM_PREFIX}" \
-#     -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath,${DIMR_PLATFORM_PREFIX}/lib -Wl,-rpath,${DIMR_PLATFORM_PREFIX}/lib/gcc15" \
-#     -DHDF5_ENABLE_PARALLEL=ON \
-#     -DBUILD_TESTING=OFF \
-#     -DCMAKE_PREFIX_PATH=${DIMR_PLATFORM_PREFIX} \
-#     -DCMAKE_IGNORE_PATH="/opt/homebrew;/usr/local" \
-#     -DCMAKE_LIBRARY_PATH=${DIMR_PLATFORM_PREFIX}/lib:${DIMR_PLATFORM_PREFIX}/lib/libaec/lib \
-#     CFLAGS="-fPIC" \
-#     CXXFLAGS="-fPIC" \
-#     FFLAGS="-fPIC" \
-#     CC=mpicc \
-#     CXX=mpicxx \
-#     FC=mpifort \
-#     -DMPI_C_COMPILER="${DIMR_PLATFORM_PREFIX}/bin/mpicc" \
-#     ..
-# unset CMAKE_PREFIX_PATH
-# unset CMAKE_LIBRARY_PATH
-# make -j$MAX_JOBS
-# sudo make install
-# if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
-#     sudo install_name_tool -id "${DIMR_PLATFORM_PREFIX}/lib/libhdf5.310.dylib" ${DIMR_PLATFORM_PREFIX}/lib/libhdf5.310.dylib
-#     sudo install_name_tool -id "${DIMR_PLATFORM_PREFIX}/lib/libhdf5_hl.310.dylib" ${DIMR_PLATFORM_PREFIX}/lib/libhdf5_hl.310.dylib
-#     sudo install_name_tool -change "@rpath/libhdf5.310.dylib" "${DIMR_PLATFORM_PREFIX}/lib/libhdf5.310.dylib" ${DIMR_PLATFORM_PREFIX}/lib/libhdf5_hl.310.dylib
-# fi
+if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
+    echo $sudoPW | sudo -S port -N install szip zlib metis expat proj6 json-c gdal ossp-uuid tiff +all
+
+    # Install specific boost on Mac that is required for Delft3DFM
+    # NOTE: Issue with github releases so use boost.io
+    cd $DIMR_INSTALL_HOME
+    export BOOST_VERSION="1.85.0"
+    export BOOST_VERSION_UNDERSCORED=${BOOST_VERSION//\./_}
+    wget https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${BOOST_VERSION_UNDERSCORED}.tar.bz2
+    tar -xf boost_${BOOST_VERSION_UNDERSCORED}.tar.bz2
+    rm boost_${BOOST_VERSION_UNDERSCORED}.tar.bz2
+    mv boost_${BOOST_VERSION_UNDERSCORED} boost-${BOOST_VERSION}
+    cd boost-${BOOST_VERSION}
+    ./bootstrap.sh --prefix=${DIMR_PLATFORM_PREFIX} --exec-prefix=${DIMR_PLATFORM_PREFIX} --with-toolset=gcc
+    ${DIMR_INSTALL_HOME}/boost-${BOOST_VERSION}/b2 architecture=arm address-model=64 link=shared runtime-link=shared boost.stacktrace.from_exception=off 
+    echo $sudoPW | sudo -S rm ${DIMR_PLATFORM_PREFIX}/lib/libboost_*.*
+    echo $sudoPW | sudo -S rm -r ${DIMR_PLATFORM_PREFIX}/lib/cmake/boost*
+    echo $sudoPW | sudo -S rm -r ${DIMR_PLATFORM_PREFIX}/lib/cmake/Boost*
+    if [ -d "${DIMR_PLATFORM_PREFIX}/include/boost" ]; then
+        echo $sudoPW | sudo -S rm -r ${DIMR_PLATFORM_PREFIX}/include/boost
+    fi
+    echo $sudoPW | sudo -S cp -R ${DIMR_INSTALL_HOME}/boost-${BOOST_VERSION}/boost ${DIMR_PLATFORM_PREFIX}/include/boost
+    echo $sudoPW | sudo -S cp -R ${DIMR_INSTALL_HOME}/boost-${BOOST_VERSION}/stage/lib/* ${DIMR_PLATFORM_PREFIX}/lib/.
+    echo $sudoPW | sudo -S cp -R ${DIMR_INSTALL_HOME}/boost-${BOOST_VERSION}/stage/lib/cmake/* ${DIMR_PLATFORM_PREFIX}/lib/cmake/.
+
+    export PROJ6_PKG_FOLDER="/opt/local/lib/proj6/lib/pkgconfig"
+    export PKG_CONFIG_PATH="${PROJ6_PKG_FOLDER}:/opt/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
+elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
+    echo $sudoPW | sudo -S apt-get update
+    echo $sudoPW | sudo -S apt-get install -y metis libgdal-dev libboost-all-dev uuid-dev sqlite3 libtiff-dev 
+fi
 
 
-# # Install netcdf-c
+# Install hdf5 using mpi
 
-# cd $DIMR_INSTALL_HOME
-# export NETCDF_C_VERSION="4.9.2"
-# wget https://downloads.unidata.ucar.edu/netcdf-c/${NETCDF_C_VERSION}/netcdf-c-${NETCDF_C_VERSION}.tar.gz
-# tar -xzf netcdf-c-${NETCDF_C_VERSION}.tar.gz
-# rm netcdf-c-${NETCDF_C_VERSION}.tar.gz
-# cd netcdf-c-${NETCDF_C_VERSION}
-# export CPPFLAGS="-I${DIMR_PLATFORM_PREFIX}/include"
-# export LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib"
-# export LIBS="-ldl"
-# export HDF5_DIR="${DIMR_PLATFORM_PREFIX}"
-# export NETCDF_ROOT="${DIMR_PLATFORM_PREFIX}"
-# ./configure     --prefix=${DIMR_PLATFORM_PREFIX}\
-#                 CC=mpicc
-#                 CXX=mpicxx \
-#                 FC=mpifort \
-#                 F77=mpifort \
-#                 --enable-parallel-hdf5 \
-#                 CPPFLAGS="-I${DIMR_PLATFORM_PREFIX}/include" \
-#                 LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib" \
-#                 --enable-shared \
-#                 CFLAGS="-I${DIMR_PLATFORM_PREFIX}/include -fPIC" \
-#                 LIBS="-L${DIMR_PLATFORM_PREFIX}/lib -lnetcdf" \
-#                 CXXFLAGS="-fPIC"
-# make -j$MAX_JOBS
-# sudo make install
-
-
-# # Install netcdf-fortran
-
-# cd $DIMR_INSTALL_HOME
-# export NETCDF_FORTRAN_VERSION="4.6.2"
-# wget https://github.com/Unidata/netcdf-fortran/archive/refs/tags/v${NETCDF_FORTRAN_VERSION}.tar.gz -O netcdf-fortran-${NETCDF_FORTRAN_VERSION}.tar.gz
-# tar -xvf netcdf-fortran-${NETCDF_FORTRAN_VERSION}.tar.gz
-# rm netcdf-fortran-${NETCDF_FORTRAN_VERSION}.tar.gz
-# cd netcdf-fortran-${NETCDF_FORTRAN_VERSION}
-# ./configure     --prefix=${DIMR_PLATFORM_PREFIX} \
-#                 CC=mpicc \
-#                 CXX=mpicxx \
-#                 FC=mpifort \
-#                 F77=mpifort \
-#                 CFLAGS="-fPIC" \
-#                 CXXFLAGS="-fPIC" \
-#                 CPPFLAGS="-I${DIMR_PLATFORM_PREFIX}/include" \
-#                 LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib" \
-#                 LIBS="-lnetcdf -lhdf5_hl -lhdf5 -lm -lz -lsz -lzstd -lblosc -lxml2 -lcurl -ldl" \
-#                 --disable-fortran-type-check \
-#                 --enable-shared \
-#                 --host=${NETCDF_FORTRAN_HOST}
-# make -j$MAX_JOBS
-# sudo make install
+cd $DIMR_INSTALL_HOME
+export HDF5_VERSION="1.14.6"
+wget https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-${HDF5_VERSION}.tar.gz
+tar -zxvf hdf5-${HDF5_VERSION}.tar.gz
+rm hdf5-${HDF5_VERSION}.tar.gz
+mv hdf5-hdf5-${HDF5_VERSION} hdf5-${HDF5_VERSION}
+cd hdf5-${HDF5_VERSION}
+mkdir build
+cd build
+export CMAKE_PREFIX_PATH="/opt/local"
+export CMAKE_IGNORE_PATH="/opt/homebrew;/usr/local"
+export CMAKE_LIBRARY_PATH="/opt/local/lib:/opt/local/lib/libaec/lib"
+${DIMR_PLATFORM_PREFIX}/bin/cmake \
+    -DCMAKE_INSTALL_PREFIX="${DIMR_PLATFORM_PREFIX}" \
+    -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath,${DIMR_PLATFORM_PREFIX}/lib -Wl,-rpath,${DIMR_PLATFORM_PREFIX}/lib/gcc15" \
+    -DHDF5_ENABLE_PARALLEL=ON \
+    -DBUILD_TESTING=OFF \
+    -DCMAKE_PREFIX_PATH=${DIMR_PLATFORM_PREFIX} \
+    -DCMAKE_IGNORE_PATH="/opt/homebrew;/usr/local" \
+    -DCMAKE_LIBRARY_PATH=${DIMR_PLATFORM_PREFIX}/lib:${DIMR_PLATFORM_PREFIX}/lib/libaec/lib \
+    CFLAGS="-fPIC" \
+    CXXFLAGS="-fPIC" \
+    FFLAGS="-fPIC" \
+    CC=mpicc \
+    CXX=mpicxx \
+    FC=mpifort \
+    -DMPI_C_COMPILER="${DIMR_PLATFORM_PREFIX}/bin/mpicc" \
+    ..
+unset CMAKE_PREFIX_PATH
+unset CMAKE_LIBRARY_PATH
+make -j$MAX_JOBS
+echo $sudoPW | sudo -S make install
+if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
+    echo $sudoPW | sudo -S install_name_tool -id "${DIMR_PLATFORM_PREFIX}/lib/libhdf5.310.dylib" ${DIMR_PLATFORM_PREFIX}/lib/libhdf5.310.dylib
+    echo $sudoPW | sudo -S install_name_tool -id "${DIMR_PLATFORM_PREFIX}/lib/libhdf5_hl.310.dylib" ${DIMR_PLATFORM_PREFIX}/lib/libhdf5_hl.310.dylib
+    echo $sudoPW | sudo -S install_name_tool -change "@rpath/libhdf5.310.dylib" "${DIMR_PLATFORM_PREFIX}/lib/libhdf5.310.dylib" ${DIMR_PLATFORM_PREFIX}/lib/libhdf5_hl.310.dylib
+fi
 
 
-# # Install esmf
+# Install netcdf-c
 
-# cd $DIMR_INSTALL_HOME
+cd $DIMR_INSTALL_HOME
+export NETCDF_C_VERSION="4.9.2"
+wget https://downloads.unidata.ucar.edu/netcdf-c/${NETCDF_C_VERSION}/netcdf-c-${NETCDF_C_VERSION}.tar.gz
+tar -xzf netcdf-c-${NETCDF_C_VERSION}.tar.gz
+rm netcdf-c-${NETCDF_C_VERSION}.tar.gz
+cd netcdf-c-${NETCDF_C_VERSION}
+export CPPFLAGS="-I${DIMR_PLATFORM_PREFIX}/include"
+export LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib"
+export LIBS="-ldl"
+export HDF5_DIR="${DIMR_PLATFORM_PREFIX}"
+export NETCDF_ROOT="${DIMR_PLATFORM_PREFIX}"
+./configure     --prefix=${DIMR_PLATFORM_PREFIX}\
+                CC=mpicc
+                CXX=mpicxx \
+                FC=mpifort \
+                F77=mpifort \
+                --enable-parallel-hdf5 \
+                CPPFLAGS="-I${DIMR_PLATFORM_PREFIX}/include" \
+                LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib" \
+                --enable-shared \
+                CFLAGS="-I${DIMR_PLATFORM_PREFIX}/include -fPIC" \
+                LIBS="-L${DIMR_PLATFORM_PREFIX}/lib -lnetcdf" \
+                CXXFLAGS="-fPIC"
+make -j$MAX_JOBS
+echo $sudoPW | sudo -S make install
+
+
+# Install netcdf-fortran
+
+cd $DIMR_INSTALL_HOME
+export NETCDF_FORTRAN_VERSION="4.6.2"
+wget https://github.com/Unidata/netcdf-fortran/archive/refs/tags/v${NETCDF_FORTRAN_VERSION}.tar.gz -O netcdf-fortran-${NETCDF_FORTRAN_VERSION}.tar.gz
+tar -xvf netcdf-fortran-${NETCDF_FORTRAN_VERSION}.tar.gz
+rm netcdf-fortran-${NETCDF_FORTRAN_VERSION}.tar.gz
+cd netcdf-fortran-${NETCDF_FORTRAN_VERSION}
+./configure     --prefix=${DIMR_PLATFORM_PREFIX} \
+                CC=mpicc \
+                CXX=mpicxx \
+                FC=mpifort \
+                F77=mpifort \
+                CFLAGS="-fPIC" \
+                CXXFLAGS="-fPIC" \
+                CPPFLAGS="-I${DIMR_PLATFORM_PREFIX}/include" \
+                LDFLAGS="-L${DIMR_PLATFORM_PREFIX}/lib" \
+                LIBS="-lnetcdf -lhdf5_hl -lhdf5 -lm -lz -lsz -lzstd -lblosc -lxml2 -lcurl -ldl" \
+                --disable-fortran-type-check \
+                --enable-shared \
+                --host=${NETCDF_FORTRAN_HOST}
+make -j$MAX_JOBS
+echo $sudoPW | sudo -S make install
+
+
+# Install esmf
+
+cd $DIMR_INSTALL_HOME
 export ESMF_VERSION="8.9.0"
-# wget https://github.com/esmf-org/esmf/archive/refs/tags/v${ESMF_VERSION}.tar.gz -O esmf-${ESMF_VERSION}.tar.gz
-# tar -xzf esmf-${ESMF_VERSION}.tar.gz
-# rm esmf-${ESMF_VERSION}.tar.gz
-# cd ${DIMR_INSTALL_HOME}/esmf-${ESMF_VERSION}
+wget https://github.com/esmf-org/esmf/archive/refs/tags/v${ESMF_VERSION}.tar.gz -O esmf-${ESMF_VERSION}.tar.gz
+tar -xzf esmf-${ESMF_VERSION}.tar.gz
+rm esmf-${ESMF_VERSION}.tar.gz
+cd ${DIMR_INSTALL_HOME}/esmf-${ESMF_VERSION}
 export ESMF_DIR=${DIMR_INSTALL_HOME}/esmf-${ESMF_VERSION}
 export ESMF_COMM=mpiuni
 export ESMF_F90COMPILER=${DIMR_PLATFORM_PREFIX}/bin/mpifort
@@ -357,24 +375,28 @@ export ESMF_C_FLAGS="-O3 -march=native -arch arm64"
 export ESMF_F90_FLAGS="-O3 -march=native -arch arm64"
 export ESMF_INSTALL_PREFIX="${ESMF_PARENT_FOLDER}/esmf-${ESMF_VERSION}"
 export ESMF_ROOT=${ESMF_INSTALL_PREFIX}
-# sudo mkdir ${ESMF_INSTALL_PREFIX}
-# sudo chown -R $USER:$GROUP ${ESMF_INSTALL_PREFIX}
-# sudo chmod -R go-w ${ESMF_INSTALL_PREFIX}
+if [ -d "${ESMF_INSTALL_PREFIX}" ]; then
+    echo "Found previous esmf folder, deleting..."
+    echo $sudoPW | sudo -S rm -r ${ESMF_INSTALL_PREFIX}
+fi
+echo $sudoPW | sudo -S mkdir ${ESMF_INSTALL_PREFIX}
+echo $sudoPW | sudo -S chown -R $USER:$GROUP ${ESMF_INSTALL_PREFIX}
+echo $sudoPW | sudo -S chmod -R go-w ${ESMF_INSTALL_PREFIX}
 
-# if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
+if [ "$DIMR_PLATFORM_NAME" = "mac_macports" ]; then
 
-#     # Workaround so ESMF compiler generates non-clang output as doesn't detect gnu compilers
-#     cp ${DIMR_INSTALL_HOME}/../build_config/Darwin.gfortranclang.default/build_rules.mk ${ESMF_DIR}/build_config/Darwin.gfortranclang.default/build_rules.mk
+    # Workaround so ESMF compiler generates non-clang output as doesn't detect gnu compilers
+    cp ${DIMR_INSTALL_HOME}/../build_config/Darwin.gfortranclang.default/build_rules.mk ${ESMF_DIR}/build_config/Darwin.gfortranclang.default/build_rules.mk
 
-#     make all    -j$MAX_JOBS \
-#                 ESMF_F90=mpifort \
-#                 ESMF_F77=mpifort \
-#                 ESMF_C=${DIMR_PLATFORM_PREFIX}/bin/gcc \
-#                 ESMF_CXX=${DIMR_PLATFORM_PREFIX}/bin/g++
-# elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
-#     make all -j$MAX_JOBS
-# fi
-# sudo make install ESMF_DIR=${ESMF_DIR} ESMF_INSTALL_PREFIX="${ESMF_INSTALL_PREFIX}"
+    make all    -j$MAX_JOBS \
+                ESMF_F90=mpifort \
+                ESMF_F77=mpifort \
+                ESMF_C=${DIMR_PLATFORM_PREFIX}/bin/gcc \
+                ESMF_CXX=${DIMR_PLATFORM_PREFIX}/bin/g++
+elif [ "$DIMR_PLATFORM_NAME" = "linux_apt" ]; then
+    make all -j$MAX_JOBS
+fi
+echo $sudoPW | sudo -S make install ESMF_DIR=${ESMF_DIR} ESMF_INSTALL_PREFIX="${ESMF_INSTALL_PREFIX}"
 export PATH=${ESMF_INSTALL_PREFIX}/bin/binO/${ESMF_PLATFORM_FOLDER}/:${PATH}
 
 
