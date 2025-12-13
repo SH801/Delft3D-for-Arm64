@@ -487,5 +487,6 @@ cmake ./src/cmake \
     -D CMAKE_Fortran_FLAGS="-fPIC" \
     -D CMAKE_VERBOSE_MAKEFILE=OFF \
     -D Boost_INCLUDE_DIR=${DIMR_PLATFORM_PREFIX}/include/boost
-cmake --build build -j$MAX_JOBS --target install --config Release
+export HALF_MAX_JOBS=$((MAX_JOBS / 2))
+cmake --build build -j$HALF_MAX_JOBS --target install --config Release
 export PATH=${DIMR_INSTALL_HOME}/Delft3D/install/bin:$PATH
