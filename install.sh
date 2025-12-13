@@ -488,5 +488,6 @@ cmake ./src/cmake \
     -D CMAKE_VERBOSE_MAKEFILE=OFF \
     -D Boost_INCLUDE_DIR=${DIMR_PLATFORM_PREFIX}/include/boost
 export HALF_MAX_JOBS=$((MAX_JOBS / 2))
+if [ "$HALF_MAX_JOBS" = "0" ]; then export HALF_MAX_JOBS=1; fi
 cmake --build build -j$HALF_MAX_JOBS --target install --config Release
 export PATH=${DIMR_INSTALL_HOME}/Delft3D/install/bin:$PATH
