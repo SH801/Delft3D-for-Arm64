@@ -4,7 +4,6 @@ build*/**
 install_*/**
 install/**
 src/**
-delft_src/**
 
 # don't ignore build_config
 !build_config/**

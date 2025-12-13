@@ -69,7 +69,7 @@ else
     exit 1
 fi
 
-export DIMR_INSTALL_HOME=$(pwd)/delft_src
+export DIMR_INSTALL_HOME=$(pwd)/src
 
 
 # Clean up previously installed src folder
